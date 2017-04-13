@@ -17,13 +17,12 @@ def getUrlData():
     pattern = re.compile('<tr[\s\S]*?</tr>')
     body = re.findall(pattern, str(response.content))
 
-    Catalog = currentTmpPath('html/'+ pageName + '/')
-
     stock_all = []
     item_count = 0
     for i in range(0, body.__len__()):
         content = getContent(body[i], charset)
 
+        #Catalog = currentTmpPath('html/' + pageName + '/')
         #path = Catalog + str(i) + '.txt'
         #writeContent(content, path);
 
@@ -41,8 +40,8 @@ def getUrlData():
         #else :
             #print i , stock_last.__len__()
 
-    dataPath = currentDataPath('html/' + pageName + '/')
     data = '\n'.join('  '.join(str(item) for item in line) for line in stock_all)
+    dataPath = currentDataPath('html/' + pageName + '/')
     writeContent(data,dataPath + 'data.txt');
     return stock_all
 
