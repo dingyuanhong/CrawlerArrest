@@ -5,7 +5,6 @@ import re
 from module.UserAgent import getUserAgent as UserAgent
 from module.Util import findCharset,currentTmpPath,currentDataPath,writeContent,getContent
 
-
 def getUrlData():
     url = 'http://quote.stockstar.com'
     pageName = 'ranklist_a_3_1_1'
@@ -13,7 +12,7 @@ def getUrlData():
 
     headers = {"User-Agent":UserAgent()} #伪装浏览器请求报头
     response = requests.get(url,headers=headers)
-    charset = findCharset(response)
+    charset = findCharset(response.content)
     pattern = re.compile('<tr[\s\S]*?</tr>')
     body = re.findall(pattern, str(response.content))
 

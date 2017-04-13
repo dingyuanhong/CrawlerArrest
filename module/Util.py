@@ -2,9 +2,9 @@ import re
 import os
 from Charset import getCharset as Charset
 
-def findCharset(response):
+def findCharset(content):
     pattern = re.compile('(?:<meta[\s\S]*?charset[ ="\']*?([\w_-]+?)[ ="\']*?/>)')
-    body = re.findall(pattern, str(response.content))
+    body = re.findall(pattern, str(content))
     if body.__len__() == 0:
         return 'urf'
     return Charset(body[0])
