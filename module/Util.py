@@ -35,6 +35,11 @@ def writeContent(line, path):
     os.write(fd, str(line))
     os.close(fd)
 
+def writeBinary(line,path):
+    fd = open(path,'wb')
+    fd.write(line)
+    fd.close()
+
 def getContent(content,charset):
     if charset == 'utf':
         return content
