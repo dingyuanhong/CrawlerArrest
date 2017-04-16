@@ -93,7 +93,7 @@ def GetDefaultPages(url,path=None):
         return 0
 
     charset = Charset(response.content)
-    content = response.content.decode(charset)
+    content = response.content.decode(charset).encode('utf8')
     maxPages = getPageMax(content)
 
     if path != None:
@@ -180,9 +180,9 @@ def getProxysList():
 
         if page >= maxPages:
             break
-        if successPage >= 100:
+        if successPage >= 10:
             break;
-        print 'index:', page
+        #print 'index:', page
         page = page + 1
 
         response,success = GetUrlResponse(url,_headers,proxys)
@@ -215,7 +215,7 @@ def getProxysList():
         writeContent(str(value).decode(pageCharset).encode('gbk'),path)
 
     # 整理代理IP格式
-    proxys = parseProxys(ip_totle)
+    proxys = parseProxys(ip_totle,4)
 
     return proxys
 
@@ -239,13 +239,19 @@ def getProxysList2():
             url = home + str(page)
         if page >= maxPages:
             break
-        if successPage >= 100:
+        if successPage >= 10:
             break;
-        page = page + 1
+
+        print 'DownLoad',page,'...'
 
         response,success = GetUrlResponse(url,_headers,proxys)
         if not success:
+            print 'Download',page,'false'
+            page = page + 1
             continue
+
+        print 'Download', page, 'success'
+        page = page + 1
 
         if pageCharset == '':
             pageCharset = Charset(response.content)
@@ -255,17 +261,20 @@ def getProxysList2():
 
         pattern = re.compile('<td>(\d.*?)</td>')  # 截取<td>与</td>之间第一个数为数字的内容
         ip_page = re.findall(pattern, str(content))
+        print ip_page
         ip_totle.extend(ip_page)
 
         if ip_page.__len__() > 0:
             successPage = successPage + 1
+        time.sleep(random.choice(range(1,3)));
 
     proxys = {
         'HTTP': [],
         'HTTPS': []
     }
-    for i in ip_totle:
-        proxys['HTTP'].append(str(i[0] + ':' + i[1]));
+    print ip_totle.__len__()
+    for i in range(0,len(ip_totle),4):
+        proxys['HTTP'].append(str(ip_totle[i] + ':' + ip_totle[i+1]));
     proxys = validateProxys(proxys);
     return proxys
 
@@ -350,6 +359,7 @@ def getProxysList3():
     return proxys
 
 if __name__ == '__main__':
-    data = getProxysList3()
-    #data = validateProxys(data)
+    data = getProxysList()
+    data = validateProxys(data)
+    print data['HTTP'].__len__()
     print data
