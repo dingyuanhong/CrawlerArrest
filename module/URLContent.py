@@ -1,75 +1,11 @@
 #coding=utf-8
-import os
 import time
 import urllib
 import requests
 import hashlib
 
-from module.UserAgent import getUserAgent as UserAgent
-
-def SetCachePath():
-	CacheDir=str(pwd) + "/../Cache/"
-
-def GetCachePath():
-    pwd=os.getcwd()
-    
-    if not os.path.exists(CacheDir):
-        os.makedirs(CacheDir);
-    return CacheDir
-
-def GetCahceFile(md5):
-    CacheDir = GetCachePath();
-    file = str(CacheDir + str(md5) + ".cache")
-    return file;
-
-def ChechCacheExpress(md5,express):
-    file = GetCahceFile(md5);
-    if not os.path.exists(file):
-        return None;
-    #print file
-    if (os.path.isfile(file)):
-        #创建时间
-        # os.path.getctime(file)
-        #修改时间
-        mtime = os.path.getmtime(file)
-        ticks = time.time()
-        # mtime = time.ctime(mtime)
-        # print mtime
-        #过期
-        if int(mtime) + int(express) > int(ticks):
-            return file
-
-    os.remove(file);
-    return None
-
-def ReadCacheFile(file):
-    data=None
-    if not os.path.exists(file):
-        return data;
-    file_object = open(file, 'rb')
-    try:
-        data = file_object.read()
-    finally:
-        file_object.close()
-    return data
-
-def WriteCacheFile(file,content):
-    with open(file, "wb") as code:
-        code.write(content)
-        code.close()
-        return;
-    if os.path.exists(file):
-        os.remove(file);
-
-def UpdateURLContent(url,file):
-    print("UpdateURLContent(\"" + url + "\")")
-    headers={"User-Agent":UserAgent()}
-    response=requests.get(url=url,headers=headers)
-    if response.status_code != 200:
-        print("UpdateURLContent(\"" + url + "\")Failed." + response.status_code)
-        return response.status_code
-    WriteCacheFile(file,response.content);
-    return response.status_code
+from UserAgent import getUserAgent as UserAgent
+from CacheFile import *
 
 def GetCapacity(capacity):
     capacity = float(capacity)
@@ -118,7 +54,17 @@ def UpdateRate(total,block,time):
         print "%s         \r"%(strRet),;
     return strRet;
 
-def DownloadURL(url,file):
+def UpdateURLContent(url,option,file):
+    print("UpdateURLContent(\"" + url + "\")")
+    headers={"User-Agent":UserAgent()}
+    response=requests.get(url=url,headers=headers)
+    if response.status_code != 200:
+        print("UpdateURLContent(\"" + url + "\")Failed." + response.status_code)
+        return response.status_code
+    WriteCacheFile(file,response.content);
+    return response.status_code
+
+def DownloadURL(url,option,file):
     print("DownloadURL(\"" + url + "\")")
     headers={"User-Agent":UserAgent()}
     response = requests.get(url=url, stream=True, headers=headers)
@@ -143,12 +89,12 @@ def DownloadURL(url,file):
         local_file.close()
     return response.status_code
 
-def GetCacheUrl(url):
+def GetCacheUrl(url,option):
     md5string = hashlib.md5(str(url).encode('utf-8')).hexdigest()
     CacheFile = ChechCacheExpress(md5string,5)
     if CacheFile == None :
         CacheFile = GetCahceFile(md5string)
-        ret = UpdateURLContent(url,CacheFile)
+        ret = UpdateURLContent(url,option,CacheFile)
         if ret != 200:
             return None
     data = ReadCacheFile(CacheFile)

@@ -4,8 +4,9 @@ import sys
 import threading
 import random
 from UserAgent import getUserAgent as UserAgent
+import json
 
-def getDefaultContent(url):
+def DefaultContent(url):
     headers = {"User-Agent": UserAgent()}
     try:
         response = requests.get(url, headers=headers)
@@ -15,10 +16,27 @@ def getDefaultContent(url):
         return ''
     return response.content
 
-def defaultValidateProxys(proxys):
-    url = "http://quote.stockstar.com/stock"  # 打算抓取内容的网页
-    content = getDefaultContent(url)
+def ProxyContent(url,proxyIP,timeout=0):
+    headers = {"User-Agent": UserAgent()}
+    proxy_ip = {type: proxyIP}  # 想验证的代理IP
+    try:
+        if timeout > 0:
+            response = requests.get(url, headers=headers, proxies=proxy_ip,timeout=timeout)
+        else:
+            response = requests.get(url, headers=headers, proxies=proxy_ip)
+    except:
+        info = sys.exc_info()
+        return ''
 
+    if response.status_code != 200:
+        return ''
+    return response.content
+
+# url = "http://quote.stockstar.com/stock"  # 打算抓取内容的网页
+# url = "https://www.baidu.com/"  # 打算抓取内容的网页
+def defaultValidateProxys(urls,proxys):
+    url = urls["http"];
+    content = DefaultContent(url)
     def validateProxy(url,type,proxy, content):
         headers = {"User-Agent": UserAgent()}
         proxy_ip = {type: proxy}  # 想验证的代理IP
@@ -42,8 +60,10 @@ def defaultValidateProxys(proxys):
         if ret == True:
             tmp['HTTP'].append(proxy)
 
-    url = "https://www.baidu.com/"  # 打算抓取内容的网页
-    content = getDefaultContent(url)
+    url = urls["https"];
+    if(url == None):
+        return tmp;
+    content = DefaultContent(url)
     for proxy in proxys['HTTPS']:
         ret = validateProxy(url,'https',proxy,content);
         if ret == True:
@@ -51,10 +71,9 @@ def defaultValidateProxys(proxys):
 
     return tmp
 
-def multitValidateProxys(proxys):
-    url = "http://www.csdn.net/company/contact.html"  # 打算抓取内容的网页
-    content = getDefaultContent(url)
-
+# url = "http://www.csdn.net/company/contact.html"  # 打算抓取内容的网页
+# url = "https://www.baidu.com/"  # 打算抓取内容的网页
+def multitValidateProxys(urls,proxys):
     tmp = {'HTTP': [], 'HTTPS': []}
     lock = threading.Lock()  # 建立一个锁
 
@@ -79,6 +98,9 @@ def multitValidateProxys(proxys):
             return True
         return False
 
+    url = urls["http"];
+    content = DefaultContent(url)
+
     def httpValidate(i):
         proxy = proxys['HTTP'][i]
         ret = validateProxy(url,'http',proxy,content)
@@ -96,10 +118,12 @@ def multitValidateProxys(proxys):
     for thread in threads:
         thread.join()
 
-    threads = []
-    url = "https://www.baidu.com/"  # 打算抓取内容的网页
-    content = getDefaultContent(url)
+    url = urls["https"];
+    if(url == None):
+        return tmp;
 
+    content = DefaultContent(url)
+    threads = []
     def httpsValidate(i):
         proxy = proxys['HTTPS'][i]
         ret = validateProxy(url,'https',proxy,content)
@@ -117,8 +141,8 @@ def multitValidateProxys(proxys):
         thread.join()
 
     return tmp
-	
-def validateProxys(proxys):
+
+def validateProxys(urls,proxys):
     tmp = {'HTTP': [], 'HTTPS': []}
     lock = threading.Lock()
     def validateProxy(url,type,proxy):
@@ -141,13 +165,15 @@ def validateProxys(proxys):
             lock.release()
 
     def httpProxy(i):
-        url = "http://quote.stockstar.com/stock"  # 打算爬取的网址
+        # url = "http://quote.stockstar.com/stock"  # 打算爬取的网址
+        url = urls["http"];
         header = 'HTTP'
         proxy = proxys[header][i]
         validateProxy(url,header,proxy);
 
     def httpsProxy(i):
-        url = "https://www.baidu.com"  # 打算爬取的网址
+        # url = "https://www.baidu.com"  # 打算爬取的网址
+        url = urls["https"];
         header = 'HTTPS'
         proxy = proxys[header][i]
         validateProxy(url, header, proxy);
@@ -162,6 +188,9 @@ def validateProxys(proxys):
     for thread in threads:
         thread.join()
 
+    if(urls["https"] == None):
+        return tmp;
+
     threads = []
     for i in range(len(proxys['HTTPS'])):
         thread = threading.Thread(target=httpsProxy, args=[i])
@@ -173,34 +202,20 @@ def validateProxys(proxys):
 
     return tmp
 
-#从文件加载代理地址数组
-def loadProxys(path):
-    fd = open(path,'r')
-    if fd == 0:
-        return []
-    lines = fd.readlines()
-    fd.close()
-    packet = []
-    for s in lines:
-        packet.append(s.strip('\n').split('  '))
-    return packet
-
-#解析代理地址
-def parseProxys(data,index):
-    proxys = {
-        'HTTP':[],
-        'HTTPS':[]
-        }
-    for item in data:
-        if item.__len__() <= index:
-            continue;
-        if item[index] == 'HTTP':
-            proxys['HTTP'].append(item[0] + ':' + item[1])
-        elif item[index] == 'HTTPS':
-            proxys['HTTPS'].append(item[0] + ':' + item[1])
-        else:
-            print item
-    return proxys
+#http://ip.chinaz.com/getip.aspx
+#高匿检查
+def checkHighhiding(url,proxyIP):
+    content = DefaultContent(url);
+    obj = json.loads(content);
+    #本地IP
+    selfIP  = obj.ip;
+    content = ProxyContent(url,proxyIP,0);
+    obj = json.loads(content);
+    theIP = obj.ip;
+    if(selfIP == theIP):
+        return false;
+    else:
+        return true;
 
 #随机代理信息
 def randomProxysIP(proxys):

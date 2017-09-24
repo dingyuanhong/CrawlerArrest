@@ -11,6 +11,38 @@ from module.UserAgent import getUserAgent as UserAgent
 from module.ValidateProxy import *
 from module.Util import *
 
+#验证代理可用性
+validateURLS = {'http':'http://www.csdn.net/company/contact.html','https':'https://www.baidu.com/'};
+
+#从文件加载代理地址数组
+def loadProxys(path):
+    fd = open(path,'r')
+    if fd == 0:
+        return []
+    lines = fd.readlines()
+    fd.close()
+    packet = []
+    for s in lines:
+        packet.append(s.strip('\n').split('  '))
+    return packet
+
+#解析代理地址
+def parseProxys(data,index):
+    proxys = {
+        'HTTP':[],
+        'HTTPS':[]
+        }
+    for item in data:
+        if item.__len__() <= index:
+            continue;
+        if item[index] == 'HTTP':
+            proxys['HTTP'].append(item[0] + ':' + item[1])
+        elif item[index] == 'HTTPS':
+            proxys['HTTPS'].append(item[0] + ':' + item[1])
+        else:
+            print item
+    return proxys
+
 def getProxys():
     url='http://www.xicidaili.com/nn/' #西刺代理
 
@@ -163,8 +195,9 @@ def getProxysList():
 
     data = loadProxys(currentTmpPath() + 'defaultData.txt')
     proxys = parseProxys(data,4);
-    proxys = validateProxys(proxys);
+    proxys = validateProxys(validateURLS,proxys);
 
+    maxPages = 2;
     if maxPages <= 1:
         maxPages = 1
 
@@ -202,7 +235,7 @@ def getProxysList():
             print 'MaxPages:', maxPages
         ip_totle.extend(data)
         tProxys = parseProxys(data,4)
-        tProxys = validateProxys(tProxys);
+        #tProxys = validateProxys(validateURLS,tProxys);
         if tProxys.__len__() > 0:
             proxys = tProxys;
 
@@ -225,7 +258,7 @@ def getProxysList2():
 
     data = loadProxys(currentTmpPath() + 'defaultData.txt')
     proxys = parseProxys(data, 4);
-    proxys = validateProxys(proxys);
+    proxys = validateProxys(validateURLS,proxys);
 
     home = 'http://www.xicidaili.com/nn/'
     pageCharset = ''
@@ -313,7 +346,7 @@ def getProxysList3():
 
     data = loadProxys(currentTmpPath() + 'defaultData.txt')
     proxys = parseProxys(data, 4);
-    proxys = validateProxys(proxys);
+    proxys = validateProxys(validateURLS,proxys);
 
     home = 'http://proxy.mimvp.com/free.php?proxy=in_hp'
     pageCharset = ''
@@ -355,11 +388,12 @@ def getProxysList3():
     }
     for i in ip_totle:
         proxys['HTTP'].append(str(i[0] + ':' + i[1]));
-    proxys = validateProxys(proxys);
+
+    proxys = validateProxys(validateURLS,proxys);
     return proxys
 
 if __name__ == '__main__':
     data = getProxysList()
-    data = validateProxys(data)
+    data = validateProxys(validateURLS,data)
     print data['HTTP'].__len__()
     print data
