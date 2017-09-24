@@ -2,7 +2,6 @@
 import time
 import urllib
 import requests
-import hashlib
 
 from UserAgent import getUserAgent as UserAgent
 from CacheFile import *
@@ -55,11 +54,19 @@ def UpdateRate(total,block,time):
     return strRet;
 
 def UpdateURLContent(url,option,file):
-    print("UpdateURLContent(\"" + url + "\")")
+    # print("UpdateURLContent(\"" + url + "\")")
     headers={"User-Agent":UserAgent()}
-    response=requests.get(url=url,headers=headers)
+    proxies = {};
+    if option != None:
+        if option.has_key('proxy') and \
+         option['proxy'] != '':
+            proxies = {type:option['proxy']};
+    try:
+        response=requests.get(url=url,headers=headers,proxies = proxies)
+    except Exception as e:
+        return 404;
     if response.status_code != 200:
-        print("UpdateURLContent(\"" + url + "\")Failed." + response.status_code)
+        print("UpdateURLContent(\"" + url + "\")Failed." + str(response.status_code))
         return response.status_code
     WriteCacheFile(file,response.content);
     return response.status_code
@@ -67,7 +74,11 @@ def UpdateURLContent(url,option,file):
 def DownloadURL(url,option,file):
     print("DownloadURL(\"" + url + "\")")
     headers={"User-Agent":UserAgent()}
-    response = requests.get(url=url, stream=True, headers=headers)
+    try:
+        response = requests.get(url=url, stream=True, headers=headers)
+    except Exception as e:
+        print e;
+        return 404;
     if response.status_code != 200:
         print("DownloadURL(\"" + url + "\")Failed." + response.status_code)
         return response.status_code
@@ -90,10 +101,16 @@ def DownloadURL(url,option,file):
     return response.status_code
 
 def GetCacheUrl(url,option):
-    md5string = hashlib.md5(str(url).encode('utf-8')).hexdigest()
-    CacheFile = ChechCacheExpress(md5string,5)
+    timeout = 0;
+    if option != None:
+        if option.has_key('timeout'):
+            timeout = option['timeout'];
+            timeout = int(timeout);
+    
+    cacheName = CreateCacheName(url);
+    CacheFile = ChechCacheExpress(cacheName,timeout)
     if CacheFile == None :
-        CacheFile = GetCahceFile(md5string)
+        CacheFile = GetCahceFile(cacheName)
         ret = UpdateURLContent(url,option,CacheFile)
         if ret != 200:
             return None

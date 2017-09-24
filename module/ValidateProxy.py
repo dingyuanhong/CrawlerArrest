@@ -5,6 +5,7 @@ import threading
 import random
 from UserAgent import getUserAgent as UserAgent
 import json
+import demjson
 
 def DefaultContent(url):
     headers = {"User-Agent": UserAgent()}
@@ -16,14 +17,15 @@ def DefaultContent(url):
         return ''
     return response.content
 
-def ProxyContent(url,proxyIP,timeout=0):
+def ProxyContent(url,proxy,timeout=0):
     headers = {"User-Agent": UserAgent()}
-    proxy_ip = {type: proxyIP}  # 想验证的代理IP
+    # {'http': ip}  # 想验证的代理IP
+    # {'https': ip}  # 想验证的代理IP
     try:
         if timeout > 0:
-            response = requests.get(url, headers=headers, proxies=proxy_ip,timeout=timeout)
+            response = requests.get(url, headers=headers, proxies=proxy,timeout=timeout)
         else:
-            response = requests.get(url, headers=headers, proxies=proxy_ip)
+            response = requests.get(url, headers=headers, proxies=proxy)
     except:
         info = sys.exc_info()
         return ''
@@ -37,11 +39,14 @@ def defaultCheckContent(sourceContent,proxyContent):
             return True;
     return False;
 
-def default(url,proxys,checkContent = defaultCheckContent):
+def default(url,type,proxys,checkContent = defaultCheckContent):
+    if len(url) == 0:
+        return [];
     defaultContent = DefaultContent(url)
     result = []
     for proxy in proxys:
-        content = ProxyContent(url,proxy);
+        proxies = {type:proxy};
+        content = ProxyContent(url,proxies);
         if content == '':
             # print proxy,' Error';
             continue;
@@ -54,24 +59,28 @@ def default(url,proxys,checkContent = defaultCheckContent):
 # https = "https://www.baidu.com/"
 #验证代理
 def defaultValidateProxys(urls,proxys):
-    http = default(urls['HTTP'],proxys['HTTP']);
-    https = default(urls['HTTPS'],proxys['HTTPS']);
+    if proxys == None:
+        return {'HTTP': [], 'HTTPS': []};
+    http = default(urls['HTTP'],'http',proxys['HTTP']);
+    https = default(urls['HTTPS'],'https',proxys['HTTPS']);
     return {'HTTP': http, 'HTTPS': https}
 
-def multit(url,proxys,checkContent = defaultCheckContent):
+def multit(url,type,proxys,checkContent = defaultCheckContent):
+    if len(url) == 0:
+        return [];
     result = [];
-    content = DefaultContent(url)
-
+    defaultcontent = DefaultContent(url)
     lock = threading.Lock()
     def validate(i):
         proxy = proxys[i]
-        content = ProxyContent(url,proxy);
+        proxies = {type:proxy};
+        content = ProxyContent(url,proxies,5);
         if content == '':
             # lock.acquire()
             # print proxy,' Error';
             # lock.release()
             return;
-        ret = checkContent(content,content);
+        ret = checkContent(defaultcontent,content);
         if ret == True:
             lock.acquire()
             result.append(proxy)
@@ -90,8 +99,10 @@ def multit(url,proxys,checkContent = defaultCheckContent):
 
 #验证代理
 def multitValidateProxys(urls,proxys):
-    http = multit(urls['HTTP'],proxys['HTTP']);
-    https = multit(urls['HTTPS'],proxys['HTTPS']);
+    if proxys == None:
+        return {'HTTP': [], 'HTTPS': []};
+    http = multit(urls['HTTP'],'http',proxys['HTTP']);
+    https = multit(urls['HTTPS'],'https',proxys['HTTPS']);
     return {'HTTP': http, 'HTTPS': https}
 
 #http://ip.chinaz.com/getip.aspx
@@ -99,18 +110,29 @@ def multitValidateProxys(urls,proxys):
 def checkHighhidingValidate(sourceContent,proxyContent):
     if (proxyContent == ''):
         return False;
-    the = json.loads(sourceContent);
-    obj = json.loads(proxyContent);
-    if (the.ip == obj.ip):
+    # the = json.loads(sourceContent);
+    # obj = json.loads(proxyContent);
+    # print sourceContent.decode('utf8')
+    # print proxyContent.decode('utf8')
+    try:
+        the = demjson.decode(sourceContent);
+        obj = demjson.decode(proxyContent);
+    except Exception,e:
+        # print e;
+        return False
+    if (the['ip'] == obj['ip']):
         return False;
     return True;
 
 #验证代理高匿
-def multitHighhidingValidateProxys(proxys):
+def multitHighhidingValidateProxys(urls,proxys):
     result = {'HTTP': [], 'HTTPS': []}
-    http = multit(urls['HTTP'],proxys['HTTP'],checkHighhidingValidate);
+    if proxys == None:
+        return result;
+    http = multit('http://ip.chinaz.com/getip.aspx','http',proxys['HTTP'],checkHighhidingValidate);
+    https = multit('http://ip.chinaz.com/getip.aspx','https',proxys['HTTP'],checkHighhidingValidate);
     result['HTTP'] = http;
-    # result['HTTPS'] = https;
+    result['HTTPS'] = https;
     return result;
 
 def randomProxy(proxys):
@@ -123,12 +145,12 @@ def randomProxy(proxys):
 
 #随机代理信息
 def randomProxysIP(proxys):
-    http = randomProxys(proxys['HTTP']);
-    https = randomProxys(proxys['HTTPS']);
-    if(http == '' and　https == ''):
-        return {}
-    else if(http == ''):
-        return {'HTTPS':https};
-    else if(https == ''):
-        return {'HTTP':http};
+    http = randomProxy(proxys['HTTP']);
+    https = randomProxy(proxys['HTTPS']);
+    if(http == '' and https == ''):
+        return {'HTTP':'','HTTPS':''}
+    elif(http == ''):
+        return {'HTTP':'','HTTPS':https};
+    elif(https == ''):
+        return {'HTTP':http,'HTTPS':''};
     return {'HTTP':http,'HTTPS':https};

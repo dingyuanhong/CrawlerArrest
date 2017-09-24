@@ -16,14 +16,13 @@ def DefaultContent(url):
         return ''
     return response.content
 
-def ProxyContent(url,proxyIP,timeout=0):
+def ProxyContent(url,proxy,timeout=0):
     headers = {"User-Agent": UserAgent()}
-    proxy = {type: proxyIP}  # 想验证的代理IP
     try:
         if timeout > 0:
             response = requests.get(url, headers=headers, proxies=proxy,timeout=timeout)
         else:
-            response = requests.get(url, headers=headers, proxies=proxy_ip)
+            response = requests.get(url, headers=headers, proxies=proxy)
     except:
         info = sys.exc_info()
         return ''
@@ -53,7 +52,8 @@ class ProxyValidate:
         self[type] = {};
         self[type].content = DefaultContent(url);
         for proxy in proxys[type]:
-            content = ProxyContent(url,proxy);
+            proxies = {type:proxy};
+            content = ProxyContent(url,proxies);
             ret = self.checkContent(type,content);
             if ret == True:
                 self.result[type].append(proxy);
@@ -77,7 +77,7 @@ class ProxyValidate:
                 self.result['HTTPS'].append(proxy);
         return self.result['HTTPS'];
 
-    def multity(url,proxys):
+    def multity(url,type,proxys):
         result = [];
         source_content = DefaultContent(url);
         lock = threading.Lock()  # 建立一个锁
@@ -88,7 +88,8 @@ class ProxyValidate:
 
         def validate(i):
             proxy = proxys[i]
-            content = ProxyContent(url,proxy);
+            proxies = {type:proxy};
+            content = ProxyContent(url,proxies);
             ret = checkContent(content);
             if ret == True:
                 lock.acquire()
@@ -107,10 +108,10 @@ class ProxyValidate:
         return result;
 
     def multitHttp(url,proxys):
-        return multity(url,proxys['HTTP']);
+        return multity(url,'http',proxys['HTTP']);
 
     def multitHttps(url,proxys):
-        return multity(url,proxys['HTTPS']);
+        return multity(url,'https',proxys['HTTPS']);
 
     #高匿检查
     def multitHTTPHighhiding(proxys):
@@ -129,7 +130,8 @@ class ProxyValidate:
 
         def validate(i):
             proxy = proxys['HTTP'][i]
-            content = ProxyContent(url,proxy);
+            proxies = {'http':proxy};
+            content = ProxyContent(url,proxies);
             ret = checkContent(content);
             if ret == True:
                 lock.acquire()

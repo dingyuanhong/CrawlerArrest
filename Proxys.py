@@ -10,38 +10,8 @@ from module.Charset import getCharset as Charset
 from module.UserAgent import getUserAgent as UserAgent
 from module.ValidateProxy import *
 from module.Util import *
-
-#验证代理可用性
-validateURLS = {'http':'http://www.csdn.net/company/contact.html','https':'https://www.baidu.com/'};
-
-#从文件加载代理地址数组
-def loadProxys(path):
-    fd = open(path,'r')
-    if fd == 0:
-        return []
-    lines = fd.readlines()
-    fd.close()
-    packet = []
-    for s in lines:
-        packet.append(s.strip('\n').split('  '))
-    return packet
-
-#解析代理地址
-def parseProxys(data,index):
-    proxys = {
-        'HTTP':[],
-        'HTTPS':[]
-        }
-    for item in data:
-        if item.__len__() <= index:
-            continue;
-        if item[index] == 'HTTP':
-            proxys['HTTP'].append(item[0] + ':' + item[1])
-        elif item[index] == 'HTTPS':
-            proxys['HTTPS'].append(item[0] + ':' + item[1])
-        else:
-            print item
-    return proxys
+from module.URLContent import *
+from module.CacheFile import *
 
 def getProxys():
     url='http://www.xicidaili.com/nn/' #西刺代理
@@ -69,8 +39,35 @@ def getProxys():
         proxys['HTTP'].append(ip_totle[i] + ':' + ip_totle[i+1])
     return proxys
 
+#验证代理可用性
+validateURL = {'HTTP':'http://www.csdn.net/company/contact.html','HTTPS':'https://www.baidu.com/'};
+
+# home = 'http://www.xicidaili.com/nn/'  # 西刺代理
+
+#解析代理地址
+def parseProxyContent(data,key):
+    proxys = {
+        'HTTP':[],
+        'HTTPS':[]
+        }
+    hasData = False;
+    for item in data:
+        if item.__len__() <= key:
+            continue;
+        if item[key] == 'HTTP':
+            proxys['HTTP'].append(item[0] + ':' + item[1])
+            hasData = True;
+        elif item[key] == 'HTTPS':
+            proxys['HTTPS'].append(item[0] + ':' + item[1])
+            hasData = True;
+        else:
+            print item
+    if hasData == False:
+        return None;
+    return proxys
+
 #获取页面最大值
-def getPageMax(content):
+def parsePageMax(content):
     pattern = re.compile(r'/nn/\d+.>(\d+)\<')
     page = re.findall(pattern,str(content))
     if page.count > 0 :
@@ -82,8 +79,8 @@ def getPageMax(content):
             return max
     return 1
 
-#获取页面代理信息数组
-def getPageContent(content):
+#解析页面代理信息数组
+def parsePageProxy(content):
     pattern = re.compile(r'(?:<tr[\s\S]*?>([\s\S]*?)</tr>)')
     page = re.findall(pattern, str(content))
     data = []
@@ -118,6 +115,36 @@ def getPageContent(content):
             index = index + 1
     return data
 
+#解析代理信息
+def parseProxy(url,option):
+    timeout = 0;
+    if option != None:
+        if option.has_key('timeout'):
+            timeout = option['timeout'];
+            timeout = int(timeout);
+
+    file = ChechCacheFileExpress(GetCacheURLFile("Result:" + url),timeout);
+    if(file == None):
+        content = GetCacheUrl(url,option);
+        if content == None:
+            return None;
+        data = parsePageProxy(content["data"])
+        value = '\n'.join('  '.join(i) for i in data)
+
+        WriteCacheFile(GetCacheURLFile("Result:" + url),value);
+        content = value;
+    else:
+        content = ReadCacheFile(file);
+
+    content = content.decode('utf8');
+    data = [];
+    packet = content.split('\n');
+    for row in packet:
+        data.append(row.split('  '));
+    ret = parseProxyContent(data,4);
+    return ret;
+
+#Obsolete
 def GetDefaultPages(url,path=None):
     headers = {"User-Agent": UserAgent()}
     response = requests.get(url, headers=headers, timeout=10)
@@ -126,10 +153,10 @@ def GetDefaultPages(url,path=None):
 
     charset = Charset(response.content)
     content = response.content.decode(charset).encode('utf8')
-    maxPages = getPageMax(content)
+    maxPages = parsePageMax(content)
 
     if path != None:
-        data = getPageContent(content)
+        data = parsePageContent(content)
         value = '\n'.join('  '.join(i) for i in data)
 
         if os.path.exists(path):
@@ -137,17 +164,7 @@ def GetDefaultPages(url,path=None):
         writeContent(str(value).decode(charset).encode('utf'),path)
     return maxPages
 
-_headers = {
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    "Accept-Encoding": "gzip, deflate, sdch",
-    "Accept-Language": "zh-CN,zh;q=0.8",
-    "Cache-Control": "max-age=0",
-    "Host": "www.xicidaili.com",
-    "Referer": "http://www.xicidaili.com/nn/",
-    "Upgrade-Insecure-Requests": "1",
-    "User-Agent": UserAgent()
-}
-
+#Obsolete
 def GetUrlResponse(url,headers,proxys = None):
     proxy = {}
     response = ''
@@ -185,25 +202,38 @@ def GetUrlResponse(url,headers,proxys = None):
 
     return response,success
 
+_headers = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Encoding": "gzip, deflate, sdch",
+    "Accept-Language": "zh-CN,zh;q=0.8",
+    "Cache-Control": "max-age=0",
+    "Host": "www.xicidaili.com",
+    "Referer": "http://www.xicidaili.com/nn/",
+    "Upgrade-Insecure-Requests": "1",
+    "User-Agent": UserAgent()
+}
+
 _cookies = None
 
 #获取代理地址列表
 def getProxysList():
     home = 'http://www.xicidaili.com/nn/'  # 西刺代理
 
-    maxPages = GetDefaultPages(home,currentTmpPath() + 'defaultData.txt');
+    proxysList = parseProxy(home,{'timeout':-1});
+    proxys = multitHighhidingValidateProxys(validateURL,proxysList);
 
-    data = loadProxys(currentTmpPath() + 'defaultData.txt')
-    proxys = parseProxys(data,4);
-    proxys = validateProxys(validateURLS,proxys);
-
-    maxPages = 2;
+    content = GetCacheUrl(home,{'timeout':-1});
+    # print content['cache'];
+    maxPages = parsePageMax(content);
     if maxPages <= 1:
         maxPages = 1
-
     # 待验证的代理IP
-    pageCharset = ''
-    ip_totle=[]
+    pageCharset = Charset(findCharset(content));
+
+    ip_totle = {
+        'HTTP':[],
+        'HTTPS':[]
+        }
     page = 0
     successPage = 0
     while True:
@@ -213,106 +243,21 @@ def getProxysList():
 
         if page >= maxPages:
             break
-        if successPage >= 10:
-            break;
+
         #print 'index:', page
         page = page + 1
 
-        response,success = GetUrlResponse(url,_headers,proxys)
-        if not success:
-            continue
+        proxysList = parseProxy(url,{'timeout':-1,'proxy':randomProxysIP(proxys)['HTTP']});
+        if proxysList == None:
+            continue;
+        proxysList = multitHighhidingValidateProxys(validateURL,proxysList);
+        proxys['HTTP'].extend(proxysList['HTTP']);
+        proxys['HTTPS'].extend(proxysList['HTTPS']);
 
-        if pageCharset == '':
-            pageCharset = Charset(response.content)
-        content = response.content.decode(pageCharset).encode('utf')
-        data = getPageContent(content)
-        if data.__len__() <= 0:
-            continue
-        #获取数据成功,则添加进入列表
-        successPage = successPage + 1
-        if  maxPages == 1:
-            maxPages = getPageMax(content);
-            print 'MaxPages:', maxPages
-        ip_totle.extend(data)
-        tProxys = parseProxys(data,4)
-        #tProxys = validateProxys(validateURLS,tProxys);
-        if tProxys.__len__() > 0:
-            proxys = tProxys;
-
-    #打印抓取内容
-    if ip_totle.__len__() > 0:
-        value = '\n'.join('  '.join(i) for i in ip_totle)
-        path = currentTmpPath() + 'allData.txt'
-        if os.path.exists(path):
-            os.remove(path);
-        writeContent(str(value).decode(pageCharset).encode('gbk'),path)
-
-    # 整理代理IP格式
-    proxys = parseProxys(ip_totle,4)
-
-    return proxys
-
-#获取代理地址列表
-def getProxysList2():
-    proxys = {'HTTP':[],'HTTPS':[]}
-
-    data = loadProxys(currentTmpPath() + 'defaultData.txt')
-    proxys = parseProxys(data, 4);
-    proxys = validateProxys(validateURLS,proxys);
-
-    home = 'http://www.xicidaili.com/nn/'
-    pageCharset = ''
-    ip_totle = []  # 所有页面的内容列表
-    page = 0
-    maxPages = 1
-    successPage = 0
-    while True:
-        url = home
-        if page > 0:
-            url = home + str(page)
-        if page >= maxPages:
-            break
-        if successPage >= 10:
-            break;
-
-        print 'DownLoad',page,'...'
-
-        response,success = GetUrlResponse(url,_headers,proxys)
-        if not success:
-            print 'Download',page,'false'
-            page = page + 1
-            continue
-
-        print 'Download', page, 'success'
-        page = page + 1
-
-        if pageCharset == '':
-            pageCharset = Charset(response.content)
-        content = response.content.decode(pageCharset).encode('utf')
-        if  maxPages <= 1:
-            maxPages = getPageMax(content);
-
-        pattern = re.compile('<td>(\d.*?)</td>')  # 截取<td>与</td>之间第一个数为数字的内容
-        ip_page = re.findall(pattern, str(content))
-        print ip_page
-        ip_totle.extend(ip_page)
-
-        if ip_page.__len__() > 0:
-            successPage = successPage + 1
-        time.sleep(random.choice(range(1,3)));
-
-    proxys = {
-        'HTTP': [],
-        'HTTPS': []
-    }
-    print ip_totle.__len__()
-    for i in range(0,len(ip_totle),4):
-        proxys['HTTP'].append(str(ip_totle[i] + ':' + ip_totle[i+1]));
-    proxys = validateProxys(proxys);
     return proxys
 
 #获取页面最大值
-def getPageMax3(content):
+def parsePageMax2(content):
     pattern = re.compile(r'>(\d+?)\</a>')
     page = re.findall(pattern,str(content))
     if page.count > 0 :
@@ -325,14 +270,72 @@ def getPageMax3(content):
     return 1
 
 def downloadImage(url,name):
-    print url
-    response,success = GetUrlResponse(url,{})
-    if success:
-        writeBinary(response.content,currentDataPath() + name)
-    else:
-        print url,'download False'
+    file = currentDataPath(name)
+    if not os.path.exists(file):
+        DownloadURL(url,{},file);
+        return {file:0};
+    return None;
 
-def getPageContent3(content):
+#解析页面代理信息数组
+def parsePageProxy2(content):
+    pattern = re.compile(r'(?:(<td[\s\S]*?>[\s\S]*?)</tr>)')
+    page = re.findall(pattern, str(content))
+    data = []
+    index = 0
+    if page.__len__() > 0:
+        rule0 = '([\s\S]*?)'
+        for item in page:
+            rule = rule0
+            pattern = re.compile('(?:<td[\s\S]*?\>' + rule + '</td\>)')
+            packet = re.findall(pattern,str(item));
+            if packet.__len__() > 0:
+                for i in range(0,packet.__len__()):
+                    if i == 0:
+                        packet[i] = ''
+                        continue
+                    elif i != 5 and i != 7 and i != 8:
+                        continue
+                    rule5 = '(?:\>(.*)<)'
+                    rule7 = '(?:title="(.*?)")'
+                    if i == 5:
+                        rule = rule3
+                    elif i == 7 or i == 8:
+                        rule = rule7
+                    pattern = re.compile(rule)
+                    value = re.findall(pattern,str(packet[i]))
+                    if value.__len__()  == 1:
+                        packet[i] = value[0]
+                    elif i == 5:
+                        packet[i] = value
+                packet.remove("");
+                print packet;
+                data.append(packet)
+            index = index + 1
+    return data
+
+def parseProxy2(url,option):
+    file = ChechCacheFileExpress(GetCacheURLFile("Result:" + url),5);
+    if(file == None):
+        content = GetCacheUrl(url,option);
+        if content == None:
+            return None;
+        data = parsePageProxy2(content["data"])
+        value = '\n'.join('  '.join(i) for i in data)
+
+        WriteCacheFile(GetCacheURLFile("Result:" + url),value);
+        content = value;
+    else:
+        content = ReadCacheFile(file);
+
+    content = content.decode('utf8');
+    data = [];
+    packet = content.split('\n');
+    for row in packet:
+        data.append(row.split('  '));
+    ret = parseProxyContent(data,4);
+    return ret;
+
+def parsePageImage(content):
     #<img src=common/ygrandimg.php?id=1&port=MmjiMm4vMpDgO0O />
     pattern = re.compile('<img src[=" ]*?(common/[\W\w/.?&=]+?)[ "/]*?>')  # 截取<td>与</td>之间第一个数为数字的内容
     ip_page = re.findall(pattern, str(content))
@@ -341,12 +344,15 @@ def getPageContent3(content):
         downloadImage("http://proxy.mimvp.com/" + ip_page[i],str(i) + '.png')
     return ip_page
 
-def getProxysList3():
+def getProxysList2():
     proxys = {'HTTP': [], 'HTTPS': []}
 
-    data = loadProxys(currentTmpPath() + 'defaultData.txt')
-    proxys = parseProxys(data, 4);
-    proxys = validateProxys(validateURLS,proxys);
+    home = 'https://proxy.mimvp.com/free.php'  # 西刺代理
+    proxysList = parseProxy2(home,{'timeout':-1});
+    print proxysList;
+    return;
+
+    proxys = multitHighhidingValidateProxys(validateURL,proxysList);
 
     home = 'http://proxy.mimvp.com/free.php?proxy=in_hp'
     pageCharset = ''
@@ -394,6 +400,5 @@ def getProxysList3():
 
 if __name__ == '__main__':
     data = getProxysList()
-    data = validateProxys(validateURLS,data)
-    print data['HTTP'].__len__()
-    print data
+    # print data['HTTP'].__len__()
+    # print data
