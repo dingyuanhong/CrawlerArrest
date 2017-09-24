@@ -32,100 +32,117 @@ def ProxyContent(url,proxyIP,timeout=0):
         return ''
     return response.content
 
-def threadProxytValidate(self,i):
+class ProxyValidate:
+    def __init__(self):
+        self.http = {};
+        self.http.content = '';
+        self.https = {};
+        self.https.content = '';
+        self.result = {'HTTP':[],'HTTPS':[]};
 
-class Proxy:
-    def __init(self):
+    def checkContent(self,type,content):
+        if(type == 'HTTP'):
+            if(content == self.http.content):
+                return True;
+        elif(type == 'HTTPS'):
+            if(content == self.https.content):
+                return True;
+        return False;
 
-    class Validate:
-        def __init__(self):
-            self.http = {};
-            self.http.content = '';
-            self.https = {};
-            self.https.content = '';
-            self.result = {'HTTP':[],'HTTPS':[]};
-        def checkContent(self,type,content):
-            if(type == 'http'):
-                if(content == self.http.content):
-                    return True;
-            elif(type == 'https'):
-                if(content == self.https.content):
-                    return True;
+    def default(self,url,type,proxys):
+        self[type] = {};
+        self[type].content = DefaultContent(url);
+        for proxy in proxys[type]:
+            content = ProxyContent(url,proxy);
+            ret = self.checkContent(type,content);
+            if ret == True:
+                self.result[type].append(proxy);
+        return self.result[type];
+
+    def http(self,url,proxys):
+        self.http.content = DefaultContent(url);
+        for proxy in proxys['HTTP']:
+            content = ProxyContent(url,proxy);
+            ret = self.checkContent('HTTP',content);
+            if ret == True:
+                self.result['HTTP'].append(proxy);
+        return self.result['HTTP'];
+
+    def https(self,url,proxys):
+        self.https.content = DefaultContent(url);
+        for proxy in proxys['HTTPS']:
+            content = ProxyContent(url,proxy);
+            ret = self.checkContent('HTTPS',content);
+            if ret == True:
+                self.result['HTTPS'].append(proxy);
+        return self.result['HTTPS'];
+
+    def multity(url,proxys):
+        result = [];
+        source_content = DefaultContent(url);
+        lock = threading.Lock()  # 建立一个锁
+        def checkContent(content):
+            if(source_content == content):
+                return True;
             return False;
 
-        def http(self,url,proxys):
-            self.http.content = DefaultContent(url);
-            for proxy in proxys['HTTP']:
-                content = ProxyContent(url,proxy);
-                ret = self.checkContent('http',content);
-                if ret == True:
-                    self.result['HTTP'].append(proxy);
-            return self.result;
+        def validate(i):
+            proxy = proxys[i]
+            content = ProxyContent(url,proxy);
+            ret = checkContent(content);
+            if ret == True:
+                lock.acquire()
+                result.append(proxy)
+                lock.release()
 
-        def https(url,proxys):
-            self.https.content = DefaultContent(url);
-            for proxy in proxys['HTTPS']:
-                content = ProxyContent(url,proxy);
-                ret = self.checkContent('https',content);
-                if ret == True:
-                    self.result['HTTPS'].append(proxy);
-            return self.result;
+        threads = []
+        for i in range(len(proxys)):
+            thread = threading.Thread(target=validate, args=[i])
+            threads.append(thread)
+            thread.start()
+        # 阻塞主进程，等待所有子线程结束
+        for thread in threads:
+            thread.join()
 
-        def multitHttp(url,proxys):
-            self.http.content = DefaultContent(url);
-            lock = threading.Lock()  # 建立一个锁
+        return result;
 
-            def validate(i):
-                proxy = proxys['HTTP'][i]
-                content = ProxyContent(url,proxy);
-                ret = self.checkContent('http',content);
-                if ret == True:
-                    lock.acquire()
-                    self.result['HTTP'].append(proxy)
-                    lock.release()
+    def multitHttp(url,proxys):
+        return multity(url,proxys['HTTP']);
 
-            threads = []
-            for i in range(len(proxys['HTTP'])):
-                thread = threading.Thread(target=validate, args=[i])
-                threads.append(thread)
-                thread.start()
-            # 阻塞主进程，等待所有子线程结束
-            for thread in threads:
-                thread.join()
+    def multitHttps(url,proxys):
+        return multity(url,proxys['HTTPS']);
 
-            return self.result;
+    #高匿检查
+    def multitHTTPHighhiding(proxys):
+        url = "http://ip.chinaz.com/getip.aspx";
+        result = [];
+        source_content = DefaultContent(url);
+        source_obj = json.loads(source_content);
 
-        def multitHttps(url,proxys):
-            self.https.content = DefaultContent(url);
-            lock = threading.Lock()  # 建立一个锁
-            def validate(i):
-                proxy = proxys['HTTPS'][i]
-                content = ProxyContent(url,proxy);
-                ret = self.checkContent('https',content);
-                if ret == True:
-                    self.result['HTTPS'].append(proxy);
+        lock = threading.Lock()  # 建立一个锁
 
-            threads = []
-            for i in range(len(proxys['HTTP'])):
-                thread = threading.Thread(target=validate, args=[i])
-                threads.append(thread)
-                thread.start()
-            # 阻塞主进程，等待所有子线程结束
-            for thread in threads:
-                thread.join()
-            return self.result;
+        def checkContent(content):
+            the_obj = json.loads(content);
+            if(source_obj.ip !== the_obj.ip):
+                return True;
+            return False;
 
-        #http://ip.chinaz.com/getip.aspx
-        #高匿检查
-        def checkHighhiding(url,proxyIP):
-            content = DefaultContent(url);
-            obj = json.loads(content);
-            #本地IP
-            selfIP  = obj.ip;
-            content = ProxyContent(url,proxyIP,0);
-            obj = json.loads(content);
-            theIP = obj.ip;
-            if(selfIP == theIP):
-                return false;
-            else:
-                return true;
+        def validate(i):
+            proxy = proxys['HTTP'][i]
+            content = ProxyContent(url,proxy);
+            ret = checkContent(content);
+            if ret == True:
+                lock.acquire()
+                result.append(proxy)
+                lock.release()
+
+        threads = []
+        for i in range(len(proxys['HTTP'])):
+            thread = threading.Thread(target=validate, args=[i])
+            threads.append(thread)
+            thread.start()
+        # 阻塞主进程，等待所有子线程结束
+        for thread in threads:
+            thread.join()
+
+        return result;
