@@ -12,6 +12,7 @@ from module.ValidateProxy import *
 from module.Util import *
 from module.URLContent import *
 from module.CacheFile import *
+from ImagePort import *
 
 def getProxys():
     url='http://www.xicidaili.com/nn/' #西刺代理
@@ -269,12 +270,11 @@ def parsePageMax2(content):
             return max
     return 1
 
-def downloadImage(url,name):
-    file = currentDataPath(name)
+def downloadImage(url,file):
     if not os.path.exists(file):
         DownloadURL(url,{},file);
-        return {file:0};
-    return None;
+        return file;
+    return file;
 
 #解析页面代理信息数组
 def parsePageProxy2(content):
@@ -283,22 +283,19 @@ def parsePageProxy2(content):
     data = []
     index = 0
     if page.__len__() > 0:
-        rule0 = '([\s\S]*?)'
         for item in page:
-            rule = rule0
-            pattern = re.compile('(?:<td[\s\S]*?\>' + rule + '</td\>)')
+            pattern = re.compile('<td[\s\S]*?\>[\s\S]*?</td\>?')
             packet = re.findall(pattern,str(item));
             if packet.__len__() > 0:
                 for i in range(0,packet.__len__()):
-                    if i == 0:
-                        packet[i] = ''
-                        continue
-                    elif i != 5 and i != 7 and i != 8:
-                        continue
-                    rule5 = '(?:\>(.*)<)'
-                    rule7 = '(?:title="(.*?)")'
+                    rule = '(?:\>(.*)<)';
+                    rule2 = '(?:src=(.*) /\>)';
+                    rule5 = '(?:\>(.*?)<)'
+                    rule7 = '(?:title=\'(.*?)\'>)'
+                    if i == 2:
+                        rule = rule2
                     if i == 5:
-                        rule = rule3
+                        rule = rule5
                     elif i == 7 or i == 8:
                         rule = rule7
                     pattern = re.compile(rule)
@@ -306,36 +303,18 @@ def parsePageProxy2(content):
                     if value.__len__()  == 1:
                         packet[i] = value[0]
                     elif i == 5:
-                        packet[i] = value
+                        val = '';
+                        for j in value:
+                            val = val + j;
+                        packet[i] = val
+                    if i == 0:
+                        packet[i] = '';
                 packet.remove("");
-                print packet;
                 data.append(packet)
-            index = index + 1
     return data
 
-def parseProxy2(url,option):
-    file = ChechCacheFileExpress(GetCacheURLFile("Result:" + url),5);
-    if(file == None):
-        content = GetCacheUrl(url,option);
-        if content == None:
-            return None;
-        data = parsePageProxy2(content["data"])
-        value = '\n'.join('  '.join(i) for i in data)
-
-        WriteCacheFile(GetCacheURLFile("Result:" + url),value);
-        content = value;
-    else:
-        content = ReadCacheFile(file);
-
-    content = content.decode('utf8');
-    data = [];
-    packet = content.split('\n');
-    for row in packet:
-        data.append(row.split('  '));
-    ret = parseProxyContent(data,4);
-    return ret;
-
-def parsePageImage(content):
+#下载所有图片文件
+def parseAllPageImage(content):
     #<img src=common/ygrandimg.php?id=1&port=MmjiMm4vMpDgO0O />
     pattern = re.compile('<img src[=" ]*?(common/[\W\w/.?&=]+?)[ "/]*?>')  # 截取<td>与</td>之间第一个数为数字的内容
     ip_page = re.findall(pattern, str(content))
@@ -344,13 +323,68 @@ def parsePageImage(content):
         downloadImage("http://proxy.mimvp.com/" + ip_page[i],str(i) + '.png')
     return ip_page
 
+#获取图片端口地址
+def GetImagePort(image):
+    cacheName = GetCacheURLName(image);
+    file = currentDataPath("cacheImage/" + cacheName + '.png');
+    downloadImage("http://proxy.mimvp.com/" + image,file);
+    md5 = GetFileMd5(file);
+    if md5 == None:
+        return None;
+    port = getImagePort(md5)
+    if(port != None):
+        return port;
+    return  "'" + md5 + "':" + "'" + cacheName + "'";
+
+#解析图片端口地址
+def parsePortImage(data):
+    result = [];
+    imageCache = [];
+    for item in data:
+        port = GetImagePort(item[1]);
+        if type(port) is int:
+            item[1] = str(port);
+            result.append(item);
+        else:
+            if port != None:
+                imageCache.append(port);
+
+    if len(imageCache) > 0:
+        print '待识别端口信息:'
+        print ',\n'.join(imageCache);
+    return result;
+
+def parseProxy2(url,option):
+    file = ChechCacheFileExpress(GetCacheURLFile("Result:" + url),5);
+    if(file == None):
+        content = GetCacheUrl(url,option);
+        if content == None:
+            return None;
+        data = parsePageProxy2(content["data"])
+        data = parsePortImage(data);
+        if len(data) > 0:
+            value = '\n'.join('  '.join(item) for item in data)
+            WriteCacheFile(GetCacheURLFile("Result:" + url),value);
+            content = value;
+        else:
+            content = '';
+    else:
+        content = ReadCacheFile(file);
+
+    content = content.decode('utf8');
+    data = [];
+    packet = content.split('\n');
+    for row in packet:
+        data.append(row.split('  '));
+    ret = parseProxyContent(data,2);
+    return ret;
+
 def getProxysList2():
     proxys = {'HTTP': [], 'HTTPS': []}
 
-    home = 'https://proxy.mimvp.com/free.php'  # 西刺代理
+    home = 'http://proxy.mimvp.com/free.php?proxy=in_hp'
+    # home = 'https://proxy.mimvp.com/free.php'
     proxysList = parseProxy2(home,{'timeout':-1});
-    print proxysList;
-    return;
 
     proxys = multitHighhidingValidateProxys(validateURL,proxysList);
 
@@ -380,8 +414,10 @@ def getProxysList2():
         if maxPages <= 1:
             maxPages = getPageMax3(content);
 
-        ip_page = getPageContent3(content)
-        ip_page = []
+        data = parsePageProxy2(content["data"])
+        data = parsePortImage(data);
+        ip_page = parseProxyContent(data,2);
+
         ip_totle.extend(ip_page)
 
         if ip_page.__len__() > 0:
@@ -399,6 +435,6 @@ def getProxysList2():
     return proxys
 
 if __name__ == '__main__':
-    data = getProxysList()
+    data = getProxysList2()
     # print data['HTTP'].__len__()
     # print data

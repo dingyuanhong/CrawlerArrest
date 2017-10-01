@@ -1,6 +1,7 @@
 import re
 import os
 from Charset import getCharset as Charset
+import hashlib
 
 def findCharset(content):
     pattern = re.compile('(?:<meta[\s\S]*?charset[ ="\']*?([\w_-]+?)[ ="\']*?/>)')
@@ -17,8 +18,9 @@ def currentTmpPath(file = None):
     if isAString(file):
         path = path + file
 
-    if not os.path.exists(path):
-        os.makedirs(path)
+    dirname, basename = os.path.split(path)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
     return path
 
 def currentDataPath(file = None):
@@ -26,9 +28,23 @@ def currentDataPath(file = None):
     if isAString(file):
         path = path + file
 
-    if not os.path.exists(path):
-        os.makedirs(path)
+    dirname, basename = os.path.split(path)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
     return path
+
+def GetFileMd5(filename):
+    if not os.path.isfile(filename):
+        return None;
+    myhash = hashlib.md5()
+    f = file(filename,'rb')
+    while True:
+        b = f.read(8096)
+        if not b :
+            break
+        myhash.update(b)
+    f.close()
+    return myhash.hexdigest()
 
 def writeContent(line, path):
     fd = os.open(path, os.O_CREAT | os.O_TRUNC | os.O_WRONLY)

@@ -35,6 +35,8 @@ def GetTimeString(seconds):
     return strRet;
 
 def UpdateRate(total,block,time):
+    if time == 0:
+        time = 1;
     rate = float(block)/time
     rateObj = GetCapacity(rate)
     blockObj = GetCapacity(block)
@@ -82,7 +84,7 @@ def DownloadURL(url,option,file):
     if response.status_code != 200:
         print("DownloadURL(\"" + url + "\")Failed." + response.status_code)
         return response.status_code
-    contentLength = response.headers['Content-Length']
+    contentLength = response.headers.get('Content-Length')
     if contentLength == None:
         contentLength = 0;
     contentLength = int(contentLength);
@@ -106,7 +108,7 @@ def GetCacheUrl(url,option):
         if option.has_key('timeout'):
             timeout = option['timeout'];
             timeout = int(timeout);
-    
+
     cacheName = CreateCacheName(url);
     CacheFile = ChechCacheExpress(cacheName,timeout)
     if CacheFile == None :
