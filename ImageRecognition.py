@@ -22,8 +22,8 @@ def decodeImage(path):
         'chi_sim',
         'eng',
         'enm',
-        'equ',
-        'osd'
+        'equ'#,
+        #'osd'
     ]
 
     enhancer = ImageEnhance.Contrast(imgry)
@@ -35,5 +35,40 @@ def decodeImage(path):
         print language,value.decode('utf8')
     print 'image',path,'decode end.'
 
-for i in range(0,20):
-    decodeImage('./data/'+ str(i) + '.png')
+import tesseract
+import cv2.cv as cv
+
+def decodeImage2(file):
+    #https://www.oschina.net/p/python-tesseract?nocache=1492601195168
+    #不知道怎么用
+    api = tesseract.TessBaseAPI()
+    api.Init('.','eng',tesseract.OEM_DEFAULT)
+    api.SetPageSegMode(tesseract.PSM_AUTO)
+
+    image = cv.LoadImage(file,cv.CV_LOAD_IMAGE_GRAYSCALE)
+    tesseract.SetCvImage(image,api)
+    text = api.GetUTF8Text()
+    conf = api.MeanTextConf()
+    print text
+    print conf
+
+def decodeImage3(file):
+    #https://www.oschina.net/p/deep-ocr
+    return
+
+import ocrolib
+
+def decodeImage4(file):
+    #https://www.oschina.net/p/ocropus
+    #https://github.com/tmbdev/ocropy
+    #ocrolib.
+    return
+
+def decodeImage5(file):
+    #Cuneiform
+    return
+
+#for i in range(0,20):
+i = 0
+decodeImage2('./data/'+ str(i) + '.png')
+
