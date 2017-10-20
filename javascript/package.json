@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "request": "2.83.0",
+    "command-line-args": "latest",
+    "commander":"latest",
+    "JSON":"latest"
+  },
+  "main": "index.js",
+  "name": "szse",
+  "version": "1.0.0"
+}

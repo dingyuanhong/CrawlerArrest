@@ -5,7 +5,7 @@ import hashlib
 
 def GetCachePath():
     pwd=os.getcwd()
-    CacheDir=str(pwd) + "/../Cache/"
+    CacheDir=str(pwd) + "/Cache/"
     if not os.path.exists(CacheDir):
         os.makedirs(CacheDir);
     return CacheDir
